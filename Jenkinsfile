@@ -73,17 +73,17 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
-    steps {
-        script {
-            sh """
-                # Using the modern 'docker compose' syntax
-                docker-compose down || true
-                docker-compose up -d
-            """
-        }
-    }
-}
+    #    stage('Deploy') {
+    #     steps {
+    #        script {
+    #        sh """
+     #           # Using the modern 'docker compose' syntax
+     #           docker-compose down || true
+     #           docker-compose up -d
+      #      """
+       # }
+    #}
+#}
      stage('Deploy to Kubernetes') {
             steps {
                 script {
