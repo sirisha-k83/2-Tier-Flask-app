@@ -73,54 +73,40 @@ pipeline {
         }
 
         stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    // This section safely handles Kubeconfig permissions by reading the content 
-                    // and placing it in a writable workspace file before running kubectl.
-                    sh """
-                        echo "--- Attempting deployment with secure Kubeconfig injection ---"
+    steps {
+        script {
+            sh """
+                echo "--- Attempting deployment using shared /tmp Kubeconfig file ---"
 
-                        # Read the content of the secure Kubeconfig file
-                        cat /root/.kube/config > \${WORKSPACE}/temp-kube-config
-                        
-                        # Check if the file was successfully read and created in the workspace
-                        if [ ! -s \${WORKSPACE}/temp-kube-config ]; then
-                            echo "ERROR: Failed to read Kubeconfig from /root/.kube/config. Confirm the file exists and is readable by root."
-                            exit 1
-                        fi
-                        
-                        # Set KUBECONFIG to the temporary file for the session
-                        export KUBECONFIG=\${WORKSPACE}/temp-kube-config
-                        
-                        # --- Apply Kubernetes Manifests ---
-                        echo "Applying Kubernetes manifests..."
-                        
-                        # 1. PVC
-                        kubectl apply -f mysql-pvc.yaml
-                        
-                        # Check PVC success
-                        if [ \$? -ne 0 ]; then
-                            echo "ERROR: Failed to apply PVC. Aborting deployment."
-                            exit 1
-                        fi
+                # Set KUBECONFIG to the globally readable temporary file
+                export KUBECONFIG=/tmp/minikube-config
+                
+                # --- Deploy Commands ---
+                echo "Applying Kubernetes manifests..."
+                
+                kubectl apply -f mysql-pvc.yaml
+                
+                # Check for success before proceeding
+                if [ \$? -ne 0 ]; then
+                    echo "ERROR: Failed to apply PVC. Aborting deployment."
+                    exit 1
+                fi
 
-                        # 2. MySQL Deployment and Service
-                        kubectl apply -f mysql.yaml
+                kubectl apply -f mysql.yaml
 
-                        echo "Waiting 30 seconds for MySQL to initialize..."
-                        sleep 30
+                echo "Waiting 30 seconds for MySQL to initialize..."
+                sleep 30
 
-                        # 3. Flask Deployment and Service
-                        kubectl apply -f flask.yaml
+                kubectl apply -f flask.yaml
 
-                        echo "Deployment complete. Checking status..."
-                        kubectl get services flask-service
-                        
-                        # Clean up the temporary config file
-                        rm -f \${WORKSPACE}/temp-kube-config
-                    """
-                }
-            }
+                echo "Deployment complete. Checking status..."
+                kubectl get services flask-service
+                
+                # We do NOT remove the file here, as it was copied globally
+                # but you should set up a cleanup job for the /tmp directory later.
+            """
         }
+    }
+  }
     }
 }
