@@ -75,18 +75,30 @@ pipeline {
 
 
      stage('Deploy to Kubernetes') {
-    // We are still keeping this variable for clarity, but the sh block will use 'sudo'
-    environment {
-        KUBECONFIG = '/root/.kube/config'
-    }
     steps {
         script {
-            // Using 'sudo' to guarantee the file is readable
+            // 1. Copy Kubeconfig content to a temporary file in the workspace
             sh """
-                echo "--- Attempting deployment with forced sudo and absolute KUBECONFIG path ---"
+                echo "--- Attempting deployment with secure Kubeconfig injection ---"
+
+                # Read the actual Kubeconfig file (which is readable by the OS root) 
+                # and pipe its content to a temp file in the Jenkins workspace (which is writable).
+                # This bypasses directory access restrictions.
+                cat /root/.kube/config > \${WORKSPACE}/temp-kube-config
                 
-                # Use sudo and the explicit KUBECONFIG variable
-                sudo kubectl apply -f mysql-pvc.yaml
+                # Check if the file was created successfully
+                if [ ! -s \${WORKSPACE}/temp-kube-config ]; then
+                    echo "ERROR: Failed to read Kubeconfig from /root/.kube/config. Check permissions on the *source* file."
+                    exit 1
+                fi
+                
+                # Set KUBECONFIG to the temporary file for the subsequent commands
+                export KUBECONFIG=\${WORKSPACE}/temp-kube-config
+                
+                # --- Deploy Commands (No sudo needed as the config is local) ---
+                echo "Applying Kubernetes manifests..."
+                
+                kubectl apply -f mysql-pvc.yaml
                 
                 # Check for success before proceeding
                 if [ $? -ne 0 ]; then
@@ -94,15 +106,18 @@ pipeline {
                     exit 1
                 fi
 
-                sudo kubectl apply -f mysql.yaml
+                kubectl apply -f mysql.yaml
 
                 echo "Waiting 30 seconds for MySQL to initialize..."
                 sleep 30
 
-                sudo kubectl apply -f flask.yaml
+                kubectl apply -f flask.yaml
 
                 echo "Deployment complete. Checking status..."
-                sudo kubectl get services flask-service
+                kubectl get services flask-service
+                
+                # Clean up the temporary config file
+                rm -f \${WORKSPACE}/temp-kube-config
             """
         }
     }
