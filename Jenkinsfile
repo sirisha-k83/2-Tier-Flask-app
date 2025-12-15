@@ -78,6 +78,10 @@ pipeline {
             steps {
                 script {
                     sh """
+                        environment {
+                     // Explicitly set the path to the config file for the root user
+                       KUBECONFIG = '/root/.kube/config'
+                       }
                         echo "--- Deploying to Kubernetes ---"
                         
                         # Apply the Persistent Volume Claim (PVC) first
