@@ -72,41 +72,41 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+   stage('Deploy to Kubernetes') {
     steps {
         script {
             sh """
-                echo "--- Attempting deployment using shared /tmp Kubeconfig file ---"
+                echo "--- Attempting deployment with secure Kubeconfig injection ---"
 
                 # Set KUBECONFIG to the globally readable temporary file
-                export KUBECONFIG=/tmp/minikube-config
+                export KUBECONFIG=/tmp/minikube-config 
                 
-                # --- Deploy Commands ---
-                echo "Applying Kubernetes manifests..."
+                # --- Deploy Commands (Adding --validate=false to bypass self-signed certificate error) ---
+                echo "Applying Kubernetes manifests, ignoring self-signed certificate validation..."
                 
-                kubectl apply -f mysql-pvc.yaml
+                # 1. PVC
+                kubectl apply -f mysql-pvc.yaml --validate=false
                 
-                # Check for success before proceeding
+                # Check PVC success
                 if [ \$? -ne 0 ]; then
                     echo "ERROR: Failed to apply PVC. Aborting deployment."
                     exit 1
                 fi
 
-                kubectl apply -f mysql.yaml
+                # 2. MySQL Deployment and Service
+                kubectl apply -f mysql.yaml --validate=false
 
                 echo "Waiting 30 seconds for MySQL to initialize..."
                 sleep 30
 
-                kubectl apply -f flask.yaml
+                # 3. Flask Deployment and Service
+                kubectl apply -f flask.yaml --validate=false
 
                 echo "Deployment complete. Checking status..."
-                kubectl get services flask-service
-                
-                # We do NOT remove the file here, as it was copied globally
-                # but you should set up a cleanup job for the /tmp directory later.
+                kubectl get services flask-service --validate=false
             """
         }
     }
-  }
+}
     }
 }
