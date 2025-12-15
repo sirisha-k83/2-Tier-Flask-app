@@ -75,36 +75,32 @@ pipeline {
 
 
      stage('Deploy to Kubernetes') {
-            steps {
-                script {
-                    sh """
-                        environment {
-                     // Explicitly set the path to the config file for the root user
-                       KUBECONFIG = '/root/.kube/config'
-                       }
-                        echo "--- Deploying to Kubernetes ---"
-                        
-                        # Apply the Persistent Volume Claim (PVC) first
-                        kubectl apply -f mysql-pvc.yaml
-                        
-                        # Apply the Database Tier (Deployment and Service)
-                        kubectl apply -f mysql.yaml
+       environment {
+        // Explicitly set the path to the config file for the root user
+        KUBECONFIG = '/root/.kube/config'
+       }
+       steps {
+        script {
+            sh """
+                echo "--- Deploying to Kubernetes using KUBECONFIG=${KUBECONFIG} ---"
+                
+                # 1. Apply PVC (Storage)
+                kubectl apply -f mysql-pvc.yaml
+                
+                # 2. Apply Database Tier (Deployment and Service)
+                kubectl apply -f mysql.yaml
 
-                        # Wait briefly for the DB to stabilize (optional but recommended)
-                        echo "Waiting 30 seconds for MySQL to initialize..."
-                        sleep 30
+                echo "Waiting 30 seconds for MySQL to initialize..."
+                sleep 30
 
-                        # Apply the Web Tier (Deployment and Service)
-                        kubectl apply -f flask.yaml
+                # 3. Apply Web Tier (Deployment and Service)
+                kubectl apply -f flask.yaml
 
-                        echo "Deployment complete. Checking status..."
-                        kubectl get services flask-service
-
-                        # Optional: Use kubectl rollout status to wait for the Deployment to be ready
-                        # kubectl rollout status deployment/flask-deployment
-                    """
-                }
-            }
+                echo "Deployment complete. Checking status..."
+                kubectl get services flask-service
+            """
         }
+    }
+}
     }
 }
