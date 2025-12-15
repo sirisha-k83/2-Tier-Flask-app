@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -21,18 +20,16 @@ pipeline {
         }
 
     stage('SonarQube Analysis') {
-      steps {
-        script {
+       steps {
+          script {
             def scannerHome = tool 'Sonar_Scanner'
             
             withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN_SECRET')]) { 
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh """
-                        def scannerHome = tool 'Sonar_Scanner';
-                         withSonarQubeEnv() {
-                        sh "${scannerHome}/bin/sonar-scanner"
-                           }
-                    """
+                    sh "${scannerHome}/bin/sonar-scanner \
+                       -Dsonar.projectKey=2-Tier-Flask-App-Key \
+                       -Dsonar.sources=./ \
+                       -Dsonar.token=${SONAR_TOKEN_SECRET}"
                 }
             }
         }
@@ -77,12 +74,40 @@ pipeline {
         }
 
         stage('Deploy') {
+    steps {
+        script {
+            sh """
+                # Using the modern 'docker compose' syntax
+                docker-compose down || true
+                docker-compose up -d
+            """
+        }
+    }
+}
+     stage('Deploy to Kubernetes') {
             steps {
                 script {
                     sh """
-                        docker-compose down || true
+                        echo "--- Deploying to Kubernetes ---"
+                        
+                        # Apply the Persistent Volume Claim (PVC) first
+                        kubectl apply -f mysql-pvc.yaml
+                        
+                        # Apply the Database Tier (Deployment and Service)
+                        kubectl apply -f mysql.yaml
 
-                        docker-compose up -d
+                        # Wait briefly for the DB to stabilize (optional but recommended)
+                        echo "Waiting 30 seconds for MySQL to initialize..."
+                        sleep 30
+
+                        # Apply the Web Tier (Deployment and Service)
+                        kubectl apply -f flask.yaml
+
+                        echo "Deployment complete. Checking status..."
+                        kubectl get services flask-service
+
+                        # Optional: Use kubectl rollout status to wait for the Deployment to be ready
+                        # kubectl rollout status deployment/flask-deployment
                     """
                 }
             }
