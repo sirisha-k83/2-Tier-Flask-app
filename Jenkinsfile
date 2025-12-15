@@ -75,29 +75,34 @@ pipeline {
 
 
      stage('Deploy to Kubernetes') {
-       environment {
-        // Explicitly set the path to the config file for the root user
+    // We are still keeping this variable for clarity, but the sh block will use 'sudo'
+    environment {
         KUBECONFIG = '/root/.kube/config'
-       }
-       steps {
+    }
+    steps {
         script {
+            // Using 'sudo' to guarantee the file is readable
             sh """
-                echo "--- Deploying to Kubernetes using KUBECONFIG=${KUBECONFIG} ---"
+                echo "--- Attempting deployment with forced sudo and absolute KUBECONFIG path ---"
                 
-                # 1. Apply PVC (Storage)
-                kubectl apply -f mysql-pvc.yaml
+                # Use sudo and the explicit KUBECONFIG variable
+                sudo kubectl apply -f mysql-pvc.yaml
                 
-                # 2. Apply Database Tier (Deployment and Service)
-                kubectl apply -f mysql.yaml
+                # Check for success before proceeding
+                if [ $? -ne 0 ]; then
+                    echo "ERROR: Failed to apply PVC. Aborting deployment."
+                    exit 1
+                fi
+
+                sudo kubectl apply -f mysql.yaml
 
                 echo "Waiting 30 seconds for MySQL to initialize..."
                 sleep 30
 
-                # 3. Apply Web Tier (Deployment and Service)
-                kubectl apply -f flask.yaml
+                sudo kubectl apply -f flask.yaml
 
                 echo "Deployment complete. Checking status..."
-                kubectl get services flask-service
+                sudo kubectl get services flask-service
             """
         }
     }
