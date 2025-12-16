@@ -72,23 +72,19 @@ pipeline {
             }
         }
 
-stage('Deploy to Kubernetes') {
-    steps {
-        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
-            sh """
-                echo "Using kubeconfig at \$KUBECONFIG"
-                kubectl get nodes
-
-                kubectl apply -f mysql-pvc.yaml
-                kubectl apply -f mysql.yaml
-                sleep 30
-                kubectl apply -f flask.yaml
-
-                kubectl get svc flask-service
-            """
-        }
+      stage('Deploy to Kubernetes') {
+       steps {
+          sh """
+          export KUBECONFIG=/var/lib/jenkins/.kube/config
+          kubectl get nodes
+          kubectl apply -f mysql-pvc.yaml
+          kubectl apply -f mysql.yaml
+          kubectl apply -f flask.yaml
+          kubectl get svc flask-service
+        """
     }
 }
+
 
     }
 }
