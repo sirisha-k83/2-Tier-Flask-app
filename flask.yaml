@@ -32,7 +32,7 @@ spec:
               value: devops
             # -----------------------------------
 
-            ---
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -42,9 +42,6 @@ spec:
     app: flask
   ports:
     - protocol: TCP
-      port: 80 # External access port
-      targetPort: 5000 # The port your Flask app is running on inside the container
-  
-  # Use LoadBalancer for cloud K8s (EKS, GKE, AKS)
-  # Use NodePort if running on a local cluster (Minikube, Kind)
+      port: 80
+      targetPort: 5000
   type: LoadBalancer
