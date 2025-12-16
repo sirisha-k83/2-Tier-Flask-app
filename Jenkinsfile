@@ -72,41 +72,23 @@ pipeline {
             }
         }
 
-   stage('Deploy to Kubernetes') {
+stage('Deploy to Kubernetes') {
     steps {
-        script {
+        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
             sh """
-                echo "--- Attempting deployment with secure Kubeconfig injection ---"
+                echo "Using kubeconfig at \$KUBECONFIG"
+                kubectl get nodes
 
-                # Set KUBECONFIG to the globally readable temporary file
-                export KUBECONFIG=/tmp/minikube-config 
-                
-                # --- Deploy Commands (Adding --validate=false to bypass self-signed certificate error) ---
-                echo "Applying Kubernetes manifests, ignoring self-signed certificate validation..."
-                
-                # 1. PVC
-                kubectl apply -f mysql-pvc.yaml --validate=false
-                
-                # Check PVC success
-                if [ \$? -ne 0 ]; then
-                    echo "ERROR: Failed to apply PVC. Aborting deployment."
-                    exit 1
-                fi
-
-                # 2. MySQL Deployment and Service
-                kubectl apply -f mysql.yaml --validate=false
-
-                echo "Waiting 30 seconds for MySQL to initialize..."
+                kubectl apply -f mysql-pvc.yaml
+                kubectl apply -f mysql.yaml
                 sleep 30
+                kubectl apply -f flask.yaml
 
-                # 3. Flask Deployment and Service
-                kubectl apply -f flask.yaml --validate=false
-
-                echo "Deployment complete. Checking status..."
-                kubectl get services flask-service --validate=false
+                kubectl get svc flask-service
             """
         }
     }
 }
+
     }
 }
